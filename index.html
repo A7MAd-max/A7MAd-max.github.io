@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ramallah Waste Containers - Advanced Edition (Final)</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol/dist/L.Control.Locate.min.css" /> 
+  
+  <style>
+    /* style the body and map */
+    body { margin: 0px; height: 100%; width: 100%; }
+    #map { position: absolute; width: 100%; top: 0px; bottom: 0; }
+
+    /* General Control Styling (Info Panel) */
+    #info-panel {
+        position: absolute; z-index: 1000;
+        top: 10px; left: 10px; max-width: 280px;
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 10px 15px; border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        font-family: Tahoma, sans-serif;
+        direction: rtl; text-align: right;
+    }
+    
+    /* Interactive Stats Styling */
+    #selection-stats { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #aaa; }
+    #selection-stats h4 { margin-top: 0; font-size: 15px; color: #007bff; }
+    .stat-item { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px; }
+    
+    /* Home Button Icon Style */
+    .leaflet-control-home {
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="rgb(0, 0, 0)" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>') !important;
+        background-size: 20px 20px !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        cursor: pointer;
+    }
+
+    /* Ensure Leaflet control is visible over other elements */
+    .leaflet-control-layers {
+        z-index: 1001 !important;
+        direction: rtl; 
+    }
+  </style>
+</head>
+
+<body>
+  <div id="info-panel">
+      <h3>إحصائيات رام الله الكلية</h3>
+      <div class="stat-item"><span class="label">عدد التجمعات الكلي:</span><span id="zone-count" class="value">0</span></div>
+      <div class="stat-item"><span class="label">عدد الحاويات الكلي:</span><span id="container-count" class="value">0</span></div>
+      
+      <div id="selection-stats" style="display:none;">
+          <h4>إحصائية المنطقة المختارة:</h4>
+          <p id="selected-zone-name" style="font-weight:bold; color:#007bff; margin-bottom: 5px;"></p>
+          <div class="stat-item">
+              <span class="label">إجمالي الحاويات في المنطقة:</span>
+              <span id="selected-container-count" class="value">0</span>
+          </div>
+      </div>
+  </div>
+  
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script> <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script> <script src="https://unpkg.com/leaflet-mouse-position@1.2.0/dist/l.control.mouse-position.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+  <script>
+    // **متغيرات التحكم الأساسية**
+    const DEFAULT_CENTER = [31.9045, 35.2045];
+    const DEFAULT_ZOOM = 17.5; 
+
+    // define map options
+    const mapOptions = { 
+      zoomSnap: 0.5, 
+      center: DEFAULT_CENTER, 
+      zoom: DEFAULT_ZOOM,
+      zoomControl: false 
+    };
+    // define the map with the options above
+    const map = L.map("map", mapOptions);
+    
+    // **Styles Definition**
+    const defaultZoneStyle = { fillColor: "green", fillOpacity: 0.3, color: "red", weight: 1.0, opacity: 0.7 };
+    const highlightZoneStyle = { fillColor: "#007bff", fillOpacity: 0.7, color: "#007bff", weight: 2.5, opacity: 1 };
+    
+    const originalContainerStyle = { radius: 5, fillColor: "orange", color: "orange", weight: 1, opacity: 1, fillOpacity: 0.8 };
+    const highlightedContainerStyle = { radius: 10, fillColor: "#ffffff", color: "#007bff", weight: 3, opacity: 1, fillOpacity: 1 };
+
+
+    let heatmapLayer;
+    let zonesLayer;
+    let wasteContainersLayer;
+    let allWasteFeatures; 
+    let layerControl; 
+
+    // **Base Layers Definition**
+    const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CARTO / OpenStreetMap', subdomains: 'abcd', maxZoom: 20 });
+    const lightMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' });
+    const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
+    
+    darkMap.addTo(map); 
+
+    // **Home Button Control (زر العودة للمركز)**
+    L.Control.Home = L.Control.extend({
+        onAdd: function(map) {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-home');
+            container.style.backgroundColor = 'white'; 
+            container.onclick = function() { map.setView(DEFAULT_CENTER, DEFAULT_ZOOM); }
+            return container;
+        }
+    });
+    L.control.home = function(opts) { return new L.Control.Home(opts); }
+    L.control.home({position: 'topleft'}).addTo(map);
+    
+    // Helper function for Heatmap data structure
+    function createHeatmapData(features) {
+        return features.map(feature => {
+            const coords = feature.geometry.coordinates;
+            return [coords[1], coords[0], 1]; 
+        });
+    }
+    
+    // **Helper function to update point style based on selection**
+    function updatePointStyle(selectedPolygon) {
+        if (!wasteContainersLayer || !selectedPolygon || !allWasteFeatures) return;
+
+        const allPoints = turf.featureCollection(allWasteFeatures.features);
+        const pointsInZone = turf.pointsWithinPolygon(allPoints, selectedPolygon);
+        const pointsInZoneIDs = pointsInZone.features.map(f => f.properties.ID); 
+        
+        wasteContainersLayer.eachLayer(function(point) {
+            const pointID = point.feature.properties.ID;
+            
+            if (pointsInZoneIDs.includes(pointID)) {
+                point.setStyle(highlightedContainerStyle);
+            } else {
+                point.setStyle(originalContainerStyle);
+            }
+        });
+        
+        // Update stats panel
+        $('#selected-zone-name').text(selectedPolygon.properties.NAME);
+        $('#selected-container-count').text(pointsInZone.features.length);
+        $('#selection-stats').fadeIn(); 
+    }
+    
+    // **Polygon Click Handler**
+    function highlightFeature(e) {
+        const layer = e.target;
+        
+        zonesLayer.eachLayer(function(zone) { zonesLayer.resetStyle(zone); });
+        layer.setStyle(highlightZoneStyle);
+        
+        updatePointStyle(layer.feature);
+
+        map.fitBounds(layer.getBounds());
+    }
+
+    // Function to attach click event to zones
+    function onEachZone(feature, layer) {
+        layer.on('click', highlightFeature); 
+        layer.on('click', function(e) { 
+            alert("Zone Name: " + feature.properties.NAME);
+        });
+    }
+    
+    // **دالة تحديث متحكم الطبقات**
+    function updateLayerControl() {
+        if (layerControl) map.removeControl(layerControl);
+        
+        const baseLayers = { 
+            "النمط الليلي (Dark)": darkMap, 
+            "النمط النهاري (Streets)": lightMap, 
+            "صور فضائية (Satellite)": satelliteMap 
+        };
+        
+        const overlays = {};
+        if (zonesLayer) overlays["التجمعات السكنية"] = zonesLayer;
+        if (wasteContainersLayer) overlays["حاويات النفايات (نقاط برتقالية)"] = wasteContainersLayer;
+        if (heatmapLayer) overlays["خريطة الحرارة/الكثافة"] = heatmapLayer;
+        
+        layerControl = L.control.layers(baseLayers, overlays, { collapsed: false, position: 'topright' }).addTo(map);
+    }
+    
+
+    // **Data Loading - Ramallah Zones (التجمعات السكنية)**
+    $.getJSON("RamallahZones.json", function(RZ) {
+      $('#zone-count').text(RZ.features.length); 
+      zonesLayer = L.geoJson(RZ, { 
+        style: defaultZoneStyle, 
+        onEachFeature: onEachZone
+      }).addTo(map); 
+    });
+
+    // **Data Loading - Waste Containers (الحاويات)**
+    $.getJSON("wasteContainer.json", function(WC) {
+      allWasteFeatures = WC;
+      $('#container-count').text(WC.features.length);
+
+      // التأكد من إضافة ID فريد (حاسم لعمل ميزة التمييز المكاني)
+      allWasteFeatures.features.forEach((f, index) => {
+          if (!f.properties.ID) {
+              f.properties.ID = 'P' + index;
+          }
+      });
+      
+      // 1. Create Point Layer (باللون البرتقالي الأصلي)
+      wasteContainersLayer = L.geoJson(allWasteFeatures, {
+        pointToLayer: function(feature, latlng) {
+          return L.circleMarker(latlng, originalContainerStyle);
+        },
+        onEachFeature: function(feature, layer) {
+            layer.on('click', function(e) {
+              alert("WA: " + feature.properties.TYPE_OF_WA);
+            });
+            layer.bindPopup("<h3>حاوية نفايات</h3>" + "<b>النوع:</b> " + (feature.properties.TYPE_OF_WA || 'غير مصنفة'));
+        }
+      }).addTo(map); 
+
+      // 2. Create Heatmap Layer
+      const heatData = createHeatmapData(allWasteFeatures.features);
+      heatmapLayer = L.heatLayer(heatData, { radius: 20, blur: 15, maxZoom: 17, gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'} });
+
+      // 3. Update Layers Control 
+      updateLayerControl();
+      
+      // **4. إضافة متحكم الزوم في الزاوية السفلية اليمنى**
+      L.control.zoom({position: 'bottomright'}).addTo(map);
+
+      // **5. شريط الإحداثيات (تحت ع الشمال)**
+      L.control.mousePosition({position: 'bottomleft', separator: ' | ', emptyString: 'حرك المؤشر للحصول على الإحداثيات', lngFirst: true, numDigits: 5}).addTo(map);
+      
+      // **6. مقياس الرسم (تحت ع اليمين، ليحل محل "المنتصف")**
+      L.control.scale({position: 'bottomright', imperial: false}).addTo(map);
+    });
+  </script>
+</body>
+</html>
