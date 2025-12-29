@@ -167,19 +167,29 @@ function loadLayer(file, name, group, styleObj) {
             layer = L.geoJson(data, {
                 pointToLayer: function (feature, latlng) {
                     return L.marker(latlng, { icon: getPointIcon(name) });
+                },
+                onEachFeature: function (feature, layer) {
+                    // FEATURE 2: Zoom to feature on click
+                    layer.on("click", function () {
+                        if (layer.getBounds) {
+                            map.fitBounds(layer.getBounds(), { maxZoom: 15 });
+                        } else {
+                            map.setView(layer.getLatLng(), 15);
+                        }
+                    });
                 }
-            }).addTo(map);
-        }
-
-        else if (group === "lines") {
-            layer = L.geoJson(data, {
-                style: styleObj
             }).addTo(map);
         }
 
         else {
             layer = L.geoJson(data, {
-                style: styleObj
+                style: styleObj,
+                onEachFeature: function (feature, layer) {
+                    // FEATURE 2: Zoom to feature on click
+                    layer.on("click", function () {
+                        map.fitBounds(layer.getBounds(), { maxZoom: 15 });
+                    });
+                }
             }).addTo(map);
         }
 
