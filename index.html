@@ -12,7 +12,7 @@
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-<!-- Turf.js for Phase 2 features -->
+<!-- Turf.js -->
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 
 <style>
@@ -88,17 +88,31 @@ function getPointIcon(type){
 }
 
 // ====================
+// TRACK LAYER LOADS
+// ====================
+var layersLoadedCount = 0;
+var totalLayersToLoad = 12; // عد الليرات التي تستخدم في Phase 2
+
+// ====================
 // LOAD LAYER FUNCTION
 // ====================
 function loadLayer(file,name,group,styleObj){
     $.getJSON(file,function(data){
         var layer;
-        if(group==="points") layer = L.geoJson(data, { pointToLayer:(f,latlng)=>L.marker(latlng,{icon:getPointIcon(name)})}).addTo(map);
-        else layer = L.geoJson(data,{ style: styleObj }).addTo(map);
+        if(group==="points"){
+            layer = L.geoJson(data,{ pointToLayer:(f,latlng)=>L.marker(latlng,{icon:getPointIcon(name)}) }).addTo(map);
+        } else {
+            layer = L.geoJson(data,{ style: styleObj }).addTo(map);
+        }
 
         layers[group][name] = layer;
         control.addOverlay(layer,name);
         document.getElementById("opacity-select").innerHTML += `<option value="${name}">${name}</option>`;
+
+        layersLoadedCount++;
+        if(layersLoadedCount === totalLayersToLoad){
+            applyPhase2Features(); // نطبق الميزات 7-12 بعد تحميل كل الليرات
+        }
     });
 }
 
@@ -145,8 +159,6 @@ document.getElementById("opacity-slider").oninput = function(){
 // ====================
 // PHASE 2 FEATURES (7-12)
 // ====================
-
-// FEATURE 7: Isolated Land Detector
 function detectIsolatedLand(wallLayer, landLayer){
     wallLayer.eachLayer(function(wall){
         landLayer.eachLayer(function(land){
@@ -155,8 +167,6 @@ function detectIsolatedLand(wallLayer, landLayer){
         });
     });
 }
-
-// FEATURE 8: Road Disruption Analyzer
 function analyzeRoadDisruption(wallLayer, roadLayer){
     roadLayer.eachLayer(function(road){
         wallLayer.eachLayer(function(wall){
@@ -165,16 +175,12 @@ function analyzeRoadDisruption(wallLayer, roadLayer){
         });
     });
 }
-
-// FEATURE 9: Land Fragmentation Analysis
 function landFragmentation(landLayer){
     landLayer.eachLayer(function(poly){
         var coords = turf.explode(poly.toGeoJSON());
         if(coords.features.length>0) L.circleMarker([coords.features[0].geometry.coordinates[1],coords.features[0].geometry.coordinates[0]],{radius:2,color:"red"}).addTo(map);
     });
 }
-
-// FEATURE 10: Settlement Threat Index
 function settlementThreat(settlementLayer, landLayer){
     settlementLayer.eachLayer(function(settlement){
         landLayer.eachLayer(function(land){
@@ -184,8 +190,6 @@ function settlementThreat(settlementLayer, landLayer){
         });
     });
 }
-
-// FEATURE 11: Service Inequality Mapping
 function serviceInequality(services, landLayer){
     services.eachLayer(function(service){
         landLayer.eachLayer(function(land){
@@ -195,8 +199,6 @@ function serviceInequality(services, landLayer){
         });
     });
 }
-
-// FEATURE 12: Land Suitability Analyzer
 function landSuitability(agriLayer, tempLayer, builtLayer){
     agriLayer.eachLayer(function(agri){
         tempLayer.eachLayer(function(temp){
@@ -211,31 +213,16 @@ function landSuitability(agriLayer, tempLayer, builtLayer){
     });
 }
 
-// APPLY PHASE 2 FEATURES AFTER LAYERS LOADED
+// APPLY PHASE 2 FEATURES AFTER ALL LAYERS LOADED
 function applyPhase2Features(){
-    if(
-        layers.polys["Ramallah Boundary"] &&
-        layers.polys["Agricultural Land"] &&
-        layers.polys["Built-up Areas"] &&
-        layers.polys["Temperature Zones"] &&
-        layers.polys["Settlements"] &&
-        layers.polys["Annexation Wall"] &&
-        layers.lines["Roads"] &&
-        layers.points["Schools"] &&
-        layers.points["Wells"]
-    ){
-        detectIsolatedLand(layers.polys["Annexation Wall"], layers.polys["Agricultural Land"]);
-        analyzeRoadDisruption(layers.polys["Annexation Wall"], layers.lines["Roads"]);
-        landFragmentation(layers.polys["Agricultural Land"]);
-        settlementThreat(layers.polys["Settlements"], layers.polys["Agricultural Land"]);
-        landSuitability(layers.polys["Agricultural Land"], layers.polys["Temperature Zones"], layers.polys["Built-up Areas"]);
-        serviceInequality(layers.points["Schools"], layers.polys["Built-up Areas"]);
-        serviceInequality(layers.points["Wells"], layers.polys["Built-up Areas"]);
-    } else {
-        setTimeout(applyPhase2Features,1000);
-    }
+    detectIsolatedLand(layers.polys["Annexation Wall"], layers.polys["Agricultural Land"]);
+    analyzeRoadDisruption(layers.polys["Annexation Wall"], layers.lines["Roads"]);
+    landFragmentation(layers.polys["Agricultural Land"]);
+    settlementThreat(layers.polys["Settlements"], layers.polys["Agricultural Land"]);
+    landSuitability(layers.polys["Agricultural Land"], layers.polys["Temperature Zones"], layers.polys["Built-up Areas"]);
+    serviceInequality(layers.points["Schools"], layers.polys["Built-up Areas"]);
+    serviceInequality(layers.points["Wells"], layers.polys["Built-up Areas"]);
 }
-applyPhase2Features();
 </script>
 </body>
 </html>
