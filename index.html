@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ramallah WebGIS - Full 18 Features</title>
+<title>Ramallah WebGIS - Phase 1</title>
 
 <!-- Leaflet CSS & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -12,24 +12,9 @@
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-<!-- Turf.js for spatial analysis -->
-<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
-
-<!-- Leaflet.heat for heatmaps -->
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-
-<!-- Leaflet Draw for interactive buffer -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
-<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-
-<!-- Chart.js for dashboard -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
 body, html { margin:0; padding:0; height:100%; }
 #map { height:100vh; }
-
-/* LEGEND */
 #legend-box { position:absolute; bottom:45px; left:10px; background:white; padding:10px 14px; border-radius:10px; width:220px; box-shadow:0 0 10px rgba(0,0,0,0.3); font-family:Arial; z-index:9998;}
 #legend-title{ font-weight:bold; text-align:center; font-size:16px; cursor:pointer; user-select:none;}
 #legend-content{ display:none; margin-top:8px; font-size:14px;}
@@ -38,19 +23,10 @@ body, html { margin:0; padding:0; height:100%; }
 .symbol-line{ width:30px; height:4px; margin-right:6px;}
 .symbol-poly{ width:22px; height:12px; border:1px solid #000; margin-right:6px;}
 
-/* OPACITY BOX */
 #opacity-box{ position:absolute; right:10px; bottom:45px; background:white; padding:12px; border-radius:10px; width:220px; box-shadow:0 0 10px rgba(0,0,0,0.3); font-family:Arial; z-index:9999;}
 #opacity-title{ font-weight:bold; text-align:center; font-size:15px; margin-bottom:8px;}
 select, input[type=range]{ width:100%; margin-top:6px; }
-
-/* SCALE CENTER */
 .leaflet-control-scale{ left:50% !important; transform:translateX(-50%); bottom:5px !important; }
-
-/* PANELS */
-.panel{ position:absolute; background:white; padding:10px; border-radius:10px; width:300px; z-index:9999; box-shadow:0 0 10px rgba(0,0,0,0.3); font-family:Arial; overflow:auto;}
-#dashboard-panel{top:10px; right:10px; height:250px;}
-#buffer-panel{top:270px; right:10px; width:220px;}
-#search-panel{top:500px; right:10px; width:220px;}
 </style>
 </head>
 <body>
@@ -81,105 +57,86 @@ select, input[type=range]{ width:100%; margin-top:6px; }
         <div class="legend-item"><span class="symbol-poly" style="background:#af7ac5"></span> Master Plans</div>
         <div class="legend-item"><span class="symbol-poly" style="background:#ff6666"></span> Settlements</div>
         <div class="legend-item"><span class="symbol-poly" style="background:#87ceeb"></span> Temperature Zones</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#00b894"></span> Smart Land Investment Advisor</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#e17055"></span> Municipal Risk Scanner</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#74b9ff"></span> Water Vulnerability Analyzer</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#d63031"></span> Quarry Impact Shadow</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#0984e3"></span> Urban Cooling Planner</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#fd79a8"></span> GeoStory Mode</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#6c5ce7"></span> Isolated Land Detector</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#00cec9"></span> Road Disruption Analyzer</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#e84393"></span> Land Fragmentation Analysis</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#55efc4"></span> Settlement Threat Index</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#fab1a0"></span> Service Inequality Mapping</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#ffeaa7"></span> Land Suitability Analyzer</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#81ecec"></span> Layer Intersection Analyzer</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#a29bfe"></span> Distance & Area Measurement Tool</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#fdcb6e"></span> Statistical Dashboard</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#00b894"></span> Interactive Buffer Tool</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#dfe6e9"></span> Spatial Search Tool</div>
-        <div class="legend-item"><span class="symbol-poly" style="background:#636e72"></span> Point Heatmap Generator</div>
         <div class="legend-item"><span class="symbol-poly" style="background:none"></span> Ramallah Boundary</div>
     </div>
-</div>
-
-<!-- DASHBOARD PANEL -->
-<div id="dashboard-panel" class="panel">
-    <canvas id="dashboard-chart"></canvas>
-</div>
-
-<!-- BUFFER PANEL -->
-<div id="buffer-panel" class="panel">
-    <strong>Interactive Buffer Tool</strong><br>
-    <button id="draw-point">Draw Point</button>
-    <button id="draw-polygon">Draw Polygon</button>
-    <button id="clear-buffer">Clear</button>
-</div>
-
-<!-- SEARCH PANEL -->
-<div id="search-panel" class="panel">
-    <strong>Spatial Search</strong><br>
-    <input type="text" id="search-input" placeholder="Search features...">
-    <div id="search-results"></div>
 </div>
 
 <script>
 // ====================
 // INITIALIZE MAP
 // ====================
-var map=L.map("map").setView([31.903,35.203],11);
+var map = L.map("map").setView([31.903, 35.203], 11);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 L.control.scale({imperial:false}).addTo(map);
-var layers={points:{},lines:{},polys:{}};
-var control=L.control.layers({}, {}, {collapsed:false}).addTo(map);
 
-// -------------------
+// ====================
+// LAYERS OBJECT
+// ====================
+var layers = { points: {}, lines: {}, polys: {} };
+var control = L.control.layers({}, {}, {collapsed:false}).addTo(map);
+
+// ====================
 // POINT ICONS
-// -------------------
+// ====================
 function getPointIcon(type){
-    return L.divIcon({html:type==="Schools"?"🏫":type==="Wells"?"💧":type==="Quarries"?"⛏️":"•",className:"",iconSize:[25,25],iconAnchor:[12,12]});
+    return L.divIcon({ html: type==="Schools"?"🏫":type==="Wells"?"💧":type==="Quarries"?"⛏️":"•",
+        className:"", iconSize:[25,25], iconAnchor:[12,12] });
 }
 
-// -------------------
+// ====================
 // LOAD LAYER FUNCTION
-// -------------------
+// ====================
 function loadLayer(file,name,group,styleObj){
     $.getJSON(file,function(data){
         var layer;
-        if(group==="points") layer=L.geoJson(data,{pointToLayer:(f,latlng)=>L.marker(latlng,{icon:getPointIcon(name)})}).addTo(map);
-        else layer=L.geoJson(data,{style:styleObj}).addTo(map);
-        layers[group][name]=layer;
+        if(group==="points") layer = L.geoJson(data, { pointToLayer:(f,latlng)=>L.marker(latlng,{icon:getPointIcon(name)})}).addTo(map);
+        else layer = L.geoJson(data,{ style: styleObj }).addTo(map);
+
+        layers[group][name] = layer;
         control.addOverlay(layer,name);
-        document.getElementById("opacity-select").innerHTML+=`<option value="${name}">${name}</option>`;
+        document.getElementById("opacity-select").innerHTML += `<option value="${name}">${name}</option>`;
     });
 }
 
-// -------------------
+// ====================
 // LOAD ALL BASE LAYERS
-// -------------------
-var baseLayers=[
-["Schools","points"],["Wells","points"],["Quarries","points"],
-["Roads","lines"],["Streams","lines"],["Annexation Wall","lines"],
-["Agricultural Land","polys"],["Closed Areas","polys"],["Built-up Areas","polys"],
-["Master Plans","polys"],["Settlements","polys"],["Temperature Zones","polys"],
-["Ramallah Boundary","polys"]
-];
-var files={
-"Schools":"Schools.geojson","Wells":"Wells.geojson","Quarries":"Quarries.geojson",
-"Roads":"Roads.geojson","Streams":"Streams.geojson","Annexation Wall":"Annexation_Wall.geojson",
-"Agricultural Land":"Agricultural_Land.geojson","Closed Areas":"Areas_totaly_closed_by_the_wall.geojson",
-"Built-up Areas":"Built_up.geojson","Master Plans":"Approved_Urban_Master_Plans_super_simplified.geojson",
-"Settlements":"Settlements.geojson","Temperature Zones":"Temperature.geojson","Ramallah Boundary":"Ramallah.geojson"
+// ====================
+loadLayer("Schools.geojson","Schools","points");
+loadLayer("Wells.geojson","Wells","points");
+loadLayer("Quarries.geojson","Quarries","points");
+
+loadLayer("Roads.geojson","Roads","lines",{color:"black",weight:2});
+loadLayer("Streams.geojson","Streams","lines",{color:"#0077ff",weight:2});
+loadLayer("Annexation_Wall.geojson","Annexation Wall","lines",{color:"#555",weight:3});
+
+loadLayer("Agricultural_Land.geojson","Agricultural Land","polys",{color:"green",fillColor:"#8fd19e",fillOpacity:0.6});
+loadLayer("Areas_totaly_closed_by_the_wall.geojson","Closed Areas","polys",{color:"orange",fillColor:"#ffb347",fillOpacity:0.6});
+loadLayer("Built_up.geojson","Built-up Areas","polys",{color:"brown",fillColor:"#c49a6c",fillOpacity:0.6});
+loadLayer("Approved_Urban_Master_Plans_super_simplified.geojson","Master Plans","polys",{color:"purple",fillColor:"#af7ac5",fillOpacity:0.6});
+loadLayer("Settlements.geojson","Settlements","polys",{color:"red",fillColor:"#ff6666",fillOpacity:0.6});
+loadLayer("Temperature.geojson","Temperature Zones","polys",{color:"blue",fillColor:"#87ceeb",fillOpacity:0.6});
+loadLayer("Ramallah.geojson","Ramallah Boundary","polys",{color:"black",fillOpacity:0});
+
+// ====================
+// LEGEND TOGGLE
+// ====================
+document.getElementById("legend-title").onclick = function(){
+    let c = document.getElementById("legend-content");
+    c.style.display = c.style.display==="none"?"block":"none";
+    this.innerHTML = c.style.display==="none"?"Legend ▼":"Legend ▲";
 };
-baseLayers.forEach(b=>loadLayer(files[b[0]],b[0],b[1],{}));
 
 // ====================
-// 18 FEATURES FUNCTIONS
+// OPACITY CONTROL
 // ====================
-// هنا كل الميزات الـ18 تضاف باستخدام Turf.js وLeaflet.heat وChart.js وLeaflet.draw
-// بسبب طول الكود، يمكنني تكمل كتابة كل Feature واحدة تلو الأخرى بنفس الطريقة حتى تكون جاهزة بالكامل للعمل على GitHub
-
+document.getElementById("opacity-slider").oninput = function(){
+    let selected = document.getElementById("opacity-select").value;
+    for(let group in layers){
+        if(layers[group][selected]){
+            layers[group][selected].setStyle({ opacity:this.value, fillOpacity:this.value });
+        }
+    }
+};
 </script>
 </body>
 </html>
-
