@@ -140,3 +140,106 @@ document.getElementById("opacity-slider").oninput = function(){
 </script>
 </body>
 </html>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script>
+// ====================
+// FEATURE 7: Isolated Land Detector
+// ====================
+function detectIsolatedLand(wallLayer, landLayer){
+    wallLayer.eachLayer(function(wall){
+        landLayer.eachLayer(function(land){
+            var diff = turf.difference(land.toGeoJSON(), wall.toGeoJSON());
+            if(diff){
+                L.geoJSON(diff,{style:{color:"#6c5ce7",fillOpacity:0.5}}).addTo(map);
+            }
+        });
+    });
+}
+
+// ====================
+// FEATURE 8: Road Disruption Analyzer
+// ====================
+function analyzeRoadDisruption(wallLayer, roadLayer){
+    roadLayer.eachLayer(function(road){
+        wallLayer.eachLayer(function(wall){
+            var intersect = turf.lineIntersect(road.toGeoJSON(), wall.toGeoJSON());
+            if(intersect.features.length>0){
+                L.geoJSON(road.toGeoJSON(),{style:{color:"#00cec9",weight:4,dashArray:"5,5"}}).addTo(map);
+            }
+        });
+    });
+}
+
+// ====================
+// FEATURE 9: Land Fragmentation Analysis
+// ====================
+function landFragmentation(landLayer){
+    landLayer.eachLayer(function(poly){
+        var coords = turf.explode(poly.toGeoJSON());
+        L.circleMarker([coords.features[0].geometry.coordinates[1],coords.features[0].geometry.coordinates[0]],{radius:2,color:"red"}).addTo(map);
+    });
+}
+
+// ====================
+// FEATURE 10: Settlement Threat Index
+// ====================
+function settlementThreat(settlementLayer, landLayer){
+    settlementLayer.eachLayer(function(settlement){
+        landLayer.eachLayer(function(land){
+            var buffer = turf.buffer(settlement.toGeoJSON(),500,{units:"meters"});
+            var intersection = turf.intersect(buffer, land.toGeoJSON());
+            if(intersection) L.geoJSON(intersection,{style:{color:"#55efc4",fillOpacity:0.6}}).addTo(map);
+        });
+    });
+}
+
+// ====================
+// FEATURE 11: Service Inequality Mapping
+// ====================
+function serviceInequality(services, landLayer){
+    services.eachLayer(function(service){
+        landLayer.eachLayer(function(land){
+            var buffer = turf.buffer(service.toGeoJSON(),1000,{units:"meters"});
+            var diff = turf.difference(land.toGeoJSON(), buffer);
+            if(diff) L.geoJSON(diff,{style:{color:"#fab1a0",fillOpacity:0.5}}).addTo(map);
+        });
+    });
+}
+
+// ====================
+// FEATURE 12: Land Suitability Analyzer
+// ====================
+function landSuitability(agriLayer, tempLayer, builtLayer){
+    agriLayer.eachLayer(function(agri){
+        tempLayer.eachLayer(function(temp){
+            builtLayer.eachLayer(function(built){
+                var intersect = turf.intersect(agri.toGeoJSON(), temp.toGeoJSON());
+                if(intersect){
+                    var finalIntersect = turf.difference(intersect, built.toGeoJSON());
+                    if(finalIntersect) L.geoJSON(finalIntersect,{style:{color:"#ffeaa7",fillOpacity:0.6}}).addTo(map);
+                }
+            });
+        });
+    });
+}
+
+// ====================
+// EXAMPLE: Apply features after layers loaded
+// ====================
+function applyPhase2Features(){
+    if(layers.polys["Ramallah Boundary"] && layers.polys["Agricultural Land"] && layers.polys["Built-up Areas"] && layers.polys["Temperature Zones"] && layers.polys["Settlements"]){
+        detectIsolatedLand(layers.polys["Annexation Wall"], layers.polys["Agricultural Land"]);
+        analyzeRoadDisruption(layers.polys["Annexation Wall"], layers.lines["Roads"]);
+        landFragmentation(layers.polys["Agricultural Land"]);
+        settlementThreat(layers.polys["Settlements"], layers.polys["Agricultural Land"]);
+        landSuitability(layers.polys["Agricultural Land"], layers.polys["Temperature Zones"], layers.polys["Built-up Areas"]);
+        // services example: Schools & Wells
+        serviceInequality(layers.points["Schools"], layers.polys["Built-up Areas"]);
+        serviceInequality(layers.points["Wells"], layers.polys["Built-up Areas"]);
+    }
+}
+
+// Wait until all layers are loaded before applying features
+setTimeout(applyPhase2Features,3000);
+</script>
+
